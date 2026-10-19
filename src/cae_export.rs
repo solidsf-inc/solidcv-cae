@@ -288,9 +288,16 @@ pub fn export_cae_field_glb(
         ];
         for tri in &faces {
             let base_idx = (positions.len() / 3) as u32;
-            let p0 = mesh.nodes[tri[0]];
-            let p1 = mesh.nodes[tri[1]];
-            let p2 = mesh.nodes[tri[2]];
+            let deformed = tri.map(|vid| {
+                let pt = mesh.nodes[vid];
+                let disp = solution
+                    .nodal_displacements_m
+                    .get(vid)
+                    .copied()
+                    .unwrap_or([0.0, 0.0, 0.0]);
+                [pt[0] + disp[0], pt[1] + disp[1], pt[2] + disp[2]]
+            });
+            let [p0, p1, p2] = deformed;
             let ux = [p1[0] - p0[0], p1[1] - p0[1], p1[2] - p0[2]];
             let vx = [p2[0] - p0[0], p2[1] - p0[1], p2[2] - p0[2]];
             let nx = ux[1] * vx[2] - ux[2] * vx[1];
@@ -299,18 +306,8 @@ pub fn export_cae_field_glb(
             let n_len = (nx * nx + ny * ny + nz * nz).sqrt().max(1e-12);
             let n_vec = [(nx / n_len) as f32, (ny / n_len) as f32, (nz / n_len) as f32];
 
-            for &vid in tri {
-                let pt = mesh.nodes[vid];
-                let disp = solution
-                    .nodal_displacements_m
-                    .get(vid)
-                    .copied()
-                    .unwrap_or([0.0, 0.0, 0.0]);
-                let p = [
-                    (pt[0] + disp[0]) as f32,
-                    (pt[1] + disp[1]) as f32,
-                    (pt[2] + disp[2]) as f32,
-                ];
+            for (&vid, pt) in tri.iter().zip(deformed) {
+                let p = [pt[0] as f32, pt[1] as f32, pt[2] as f32];
                 for c in 0..3 {
                     min_pos[c] = min_pos[c].min(p[c]);
                     max_pos[c] = max_pos[c].max(p[c]);
